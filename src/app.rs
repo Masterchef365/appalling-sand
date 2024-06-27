@@ -1,4 +1,7 @@
-use egui::{gui_zoom::kb_shortcuts, Button, Color32, DragValue, Rect, Ui, Vec2};
+use egui::{
+    gui_zoom::kb_shortcuts, popup_below_widget, Button, Color32, DragValue, Id, Rect, Ui, Vec2,
+    Widget,
+};
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -111,9 +114,7 @@ fn rule_editor(ui: &mut Ui, rule: &mut Rule, elements: &[Element]) {
     ui.add_sized(Vec2::new(200., 50.), |ui: &mut Ui| {
         ui.columns(3, |cols| {
             block_editor(&mut cols[0], pat_in, elements);
-            let ret = cols[1].centered_and_justified(|ui| {
-                ui.label(" -> ")
-            });
+            let ret = cols[1].centered_and_justified(|ui| ui.label(" -> "));
             block_editor(&mut cols[2], pat_out, elements);
             ret.inner
         })
@@ -125,17 +126,33 @@ fn block_editor(ui: &mut Ui, block: &mut ElementIndexBlock, elements: &[Element]
         for (col_idx, col) in cols.iter_mut().enumerate() {
             for row_idx in 0..2 {
                 let block_idx = row_idx * 2 + col_idx;
-                index_editor(col, &mut block[block_idx], elements);
+                element_selector(col, &mut block[block_idx], elements);
             }
         }
     });
 }
 
-fn index_editor(ui: &mut Ui, index: &mut usize, elements: &[Element]) {
-    let button = Button::new("")
-        .fill(elements[*index].color)
+fn element_selector(ui: &mut Ui, seleccted_element: &mut usize, elements: &[Element]) {
+    let resp = Button::new("")
+        .fill(elements[*seleccted_element].color)
         .wrap(false)
-        .min_size(Vec2::splat(20.));
+        .min_size(Vec2::splat(20.))
+        .ui(ui);
 
-    if ui.add(button).clicked() {}
+    let ptr = seleccted_element as *const usize as u64;
+    let popup_id = Id::new(("index_editor_popup", ptr));
+
+    if resp.clicked() {
+        ui.memory_mut(|mem| mem.open_popup(popup_id));
+    }
+
+    popup_below_widget(ui, popup_id, &resp, |ui| {
+        ui.horizontal(|ui| {
+            for (idx, element) in elements.iter().enumerate() {
+                if ui.button(&element.name).clicked() {
+                    *seleccted_element = idx;
+                }
+            }
+        });
+    });
 }
