@@ -1,4 +1,4 @@
-use egui::{gui_zoom::kb_shortcuts, Color32, DragValue, Ui};
+use egui::{gui_zoom::kb_shortcuts, Button, Color32, DragValue, Rect, Ui, Vec2};
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -7,16 +7,22 @@ pub struct TemplateApp {
     intrin: SimIntrinsics,
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Default)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug, Default)]
 pub struct SimIntrinsics {
     elements: Vec<Element>,
+    rules: Vec<Rule>,
 }
 
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 pub struct Element {
     color: Color32,
     name: String,
 }
+
+pub type ElementIndexBlock = [usize; 4];
+
+#[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug, Default)]
+pub struct Rule(ElementIndexBlock, ElementIndexBlock);
 
 impl Default for TemplateApp {
     fn default() -> Self {
@@ -32,6 +38,7 @@ impl Default for TemplateApp {
                         name: "On".to_string(),
                     },
                 ],
+                rules: vec![Rule([1, 0, 1, 0], [0, 0, 1, 1])],
             },
         }
     }
@@ -71,11 +78,18 @@ fn sim_intrin_editor(ui: &mut Ui, intrin: &mut SimIntrinsics) {
     }
 
     let mut num_elem = intrin.elements.len();
-    if ui.add(DragValue::new(&mut num_elem).prefix("# of elements: ")).changed() {
+    if ui
+        .add(DragValue::new(&mut num_elem).prefix("# of elements: "))
+        .changed()
+    {
         intrin.elements.resize_with(num_elem, || Element::default());
     }
+    ui.separator();
 
     ui.strong("Rules");
+    for rule in &mut intrin.rules {
+        rule_editor(ui, rule, &intrin.elements);
+    }
 }
 
 fn element_editor(ui: &mut Ui, element: &mut Element) {
@@ -85,6 +99,43 @@ fn element_editor(ui: &mut Ui, element: &mut Element) {
 
 impl Default for Element {
     fn default() -> Self {
-        Self { color: Color32::GREEN, name: "New element".into() }
+        Self {
+            color: Color32::GREEN,
+            name: "New element".into(),
+        }
     }
+}
+
+fn rule_editor(ui: &mut Ui, rule: &mut Rule, elements: &[Element]) {
+    let Rule(pat_in, pat_out) = rule;
+    ui.add_sized(Vec2::new(200., 50.), |ui: &mut Ui| {
+        ui.columns(3, |cols| {
+            block_editor(&mut cols[0], pat_in, elements);
+            let ret = cols[1].centered_and_justified(|ui| {
+                ui.label(" -> ")
+            });
+            block_editor(&mut cols[2], pat_out, elements);
+            ret.inner
+        })
+    });
+}
+
+fn block_editor(ui: &mut Ui, block: &mut ElementIndexBlock, elements: &[Element]) {
+    ui.columns(2, |cols| {
+        for (col_idx, col) in cols.iter_mut().enumerate() {
+            for row_idx in 0..2 {
+                let block_idx = row_idx * 2 + col_idx;
+                index_editor(col, &mut block[block_idx], elements);
+            }
+        }
+    });
+}
+
+fn index_editor(ui: &mut Ui, index: &mut usize, elements: &[Element]) {
+    let button = Button::new("")
+        .fill(elements[*index].color)
+        .wrap(false)
+        .min_size(Vec2::splat(20.));
+
+    if ui.add(button).clicked() {}
 }
