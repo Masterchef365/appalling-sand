@@ -1,6 +1,6 @@
 use egui::{
-    gui_zoom::kb_shortcuts, popup_below_widget, Button, Color32, DragValue, Id, Rect, ScrollArea,
-    Ui, Vec2, Widget,
+    ahash::HashMap, gui_zoom::kb_shortcuts, popup_below_widget, Button, Color32, DragValue, Id,
+    Rect, ScrollArea, Ui, Vec2, Widget,
 };
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
@@ -13,7 +13,7 @@ pub struct TemplateApp {
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug, Default)]
 pub struct SimIntrinsics {
     elements: Vec<Element>,
-    rules: Vec<Rule>,
+    rules: HashMap<ElementIndexBlock, ElementIndexBlock>,
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
@@ -23,9 +23,6 @@ pub struct Element {
 }
 
 pub type ElementIndexBlock = [usize; 4];
-
-#[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug, Default)]
-pub struct Rule(ElementIndexBlock, ElementIndexBlock);
 
 impl Default for TemplateApp {
     fn default() -> Self {
@@ -41,7 +38,7 @@ impl Default for TemplateApp {
                         name: "On".to_string(),
                     },
                 ],
-                rules: vec![Rule([1, 0, 1, 0], [0, 0, 1, 1])],
+                rules: [([1, 0, 1, 0], [0, 0, 1, 1])].into_iter().collect(),
             },
         }
     }
@@ -92,8 +89,8 @@ fn sim_intrin_editor(ui: &mut Ui, intrin: &mut SimIntrinsics) {
     ui.separator();
 
     ui.strong("Rules");
-    for rule in &mut intrin.rules {
-        rule_editor(ui, rule, &intrin.elements);
+    for (pat_in, pat_out) in &mut intrin.rules {
+        rule_editor(ui, pat_in, pat_out, &intrin.elements);
     }
 }
 
@@ -111,13 +108,17 @@ impl Default for Element {
     }
 }
 
-fn rule_editor(ui: &mut Ui, rule: &mut Rule, elements: &[Element]) {
-    let Rule(pat_in, pat_out) = rule;
+fn rule_editor(
+    ui: &mut Ui,
+    input_pat: &ElementIndexBlock,
+    output_pat: &mut ElementIndexBlock,
+    elements: &[Element],
+) {
     ui.add_sized(Vec2::new(200., 50.), |ui: &mut Ui| {
         ui.columns(3, |cols| {
-            block_editor(&mut cols[0], pat_in, elements);
+            block_editor(&mut cols[0], &mut input_pat.clone(), elements);
             let ret = cols[1].centered_and_justified(|ui| ui.label(" -> "));
-            block_editor(&mut cols[2], pat_out, elements);
+            block_editor(&mut cols[2], output_pat, elements);
             ret.inner
         })
     });
@@ -135,7 +136,7 @@ fn block_editor(ui: &mut Ui, block: &mut ElementIndexBlock, elements: &[Element]
 }
 
 fn element_selector(ui: &mut Ui, selected_element: &mut usize, elements: &[Element]) {
-    let resp = colored_button(ui, elements[*selected_element].color);
+    let resp = element_button(ui, &elements[*selected_element]);
 
     let ptr = selected_element as *const usize as u64;
     let popup_id = Id::new(("index_editor_popup", ptr));
@@ -147,7 +148,7 @@ fn element_selector(ui: &mut Ui, selected_element: &mut usize, elements: &[Eleme
     popup_below_widget(ui, popup_id, &resp, |ui| {
         ui.horizontal(|ui| {
             for (idx, element) in elements.iter().enumerate() {
-                if colored_button(ui, element.color).clicked() {
+                if element_button(ui, element).clicked() {
                     *selected_element = idx;
                 }
             }
@@ -155,10 +156,13 @@ fn element_selector(ui: &mut Ui, selected_element: &mut usize, elements: &[Eleme
     });
 }
 
-fn colored_button(ui: &mut Ui, color: Color32) -> egui::Response {
+fn element_button(ui: &mut Ui, element: &Element) -> egui::Response {
     Button::new("")
-        .fill(color)
+        .fill(element.color)
         .wrap(false)
         .min_size(Vec2::splat(20.))
         .ui(ui)
+        .on_hover_ui(|ui| {
+            ui.label(&element.name);
+        })
 }
