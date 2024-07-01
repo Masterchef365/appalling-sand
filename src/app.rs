@@ -14,13 +14,13 @@ pub struct TemplateApp {
 #[derive(serde::Deserialize, serde::Serialize, Default)]
 pub struct Sim {
     intrin: SimIntrinsics,
+    rules: HashMap<ElementIndexBlock, ElementIndexBlock>,
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 pub struct SimIntrinsics {
     elements: Vec<Element>,
     symmetry: Symmetry,
-    rules: HashMap<ElementIndexBlock, ElementIndexBlock>,
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug, Default)]
@@ -52,7 +52,6 @@ impl Default for SimIntrinsics {
                     name: "On".to_string(),
                 },
             ],
-            rules: [([1, 0, 1, 0], [0, 0, 1, 1])].into_iter().collect(),
             symmetry: Symmetry { horizontal: true },
         }
     }
@@ -79,6 +78,7 @@ impl eframe::App for TemplateApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             sim_intrin_editor(ui, &mut self.sim.intrin);
+            sim_rule_editor(ui, &mut self.sim.rules, &self.sim.intrin);
         });
     }
 }
@@ -105,11 +105,18 @@ fn sim_intrin_editor(ui: &mut Ui, intrin: &mut SimIntrinsics) {
     ui.strong("Symmetry");
     ui.checkbox(&mut intrin.symmetry.horizontal, "Horizontal");
     ui.separator();
+}
 
+fn sim_rule_editor(
+    ui: &mut Ui,
+    rules: &mut HashMap<ElementIndexBlock, ElementIndexBlock>,
+    intrin: &SimIntrinsics,
+) {
     ui.strong("Rules");
-    for (pat_in, pat_out) in &mut intrin.rules {
+    for (pat_in, pat_out) in rules {
         rule_editor(ui, pat_in, pat_out, &intrin.elements);
     }
+    ui.separator();
 }
 
 fn element_editor(ui: &mut Ui, element: &mut Element) {
