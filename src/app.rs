@@ -1,6 +1,6 @@
 use egui::{
-    gui_zoom::kb_shortcuts, popup_below_widget, Button, Color32, DragValue, Id, Rect, Ui, Vec2,
-    Widget,
+    gui_zoom::kb_shortcuts, popup_below_widget, Button, Color32, DragValue, Id, Rect, ScrollArea,
+    Ui, Vec2, Widget,
 };
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
@@ -74,11 +74,13 @@ impl eframe::App for TemplateApp {
 
 fn sim_intrin_editor(ui: &mut Ui, intrin: &mut SimIntrinsics) {
     ui.strong("Elements");
-    for element in &mut intrin.elements {
-        ui.horizontal(|ui| {
-            element_editor(ui, element);
-        });
-    }
+    ScrollArea::vertical().show(ui, |ui| {
+        for element in &mut intrin.elements {
+            ui.horizontal(|ui| {
+                element_editor(ui, element);
+            });
+        }
+    });
 
     let mut num_elem = intrin.elements.len();
     if ui
@@ -132,14 +134,10 @@ fn block_editor(ui: &mut Ui, block: &mut ElementIndexBlock, elements: &[Element]
     });
 }
 
-fn element_selector(ui: &mut Ui, seleccted_element: &mut usize, elements: &[Element]) {
-    let resp = Button::new("")
-        .fill(elements[*seleccted_element].color)
-        .wrap(false)
-        .min_size(Vec2::splat(20.))
-        .ui(ui);
+fn element_selector(ui: &mut Ui, selected_element: &mut usize, elements: &[Element]) {
+    let resp = colored_button(ui, elements[*selected_element].color);
 
-    let ptr = seleccted_element as *const usize as u64;
+    let ptr = selected_element as *const usize as u64;
     let popup_id = Id::new(("index_editor_popup", ptr));
 
     if resp.clicked() {
@@ -149,10 +147,18 @@ fn element_selector(ui: &mut Ui, seleccted_element: &mut usize, elements: &[Elem
     popup_below_widget(ui, popup_id, &resp, |ui| {
         ui.horizontal(|ui| {
             for (idx, element) in elements.iter().enumerate() {
-                if ui.button(&element.name).clicked() {
-                    *seleccted_element = idx;
+                if colored_button(ui, element.color).clicked() {
+                    *selected_element = idx;
                 }
             }
         });
     });
+}
+
+fn colored_button(ui: &mut Ui, color: Color32) -> egui::Response {
+    Button::new("")
+        .fill(color)
+        .wrap(false)
+        .min_size(Vec2::splat(20.))
+        .ui(ui)
 }
