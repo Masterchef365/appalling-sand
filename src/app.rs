@@ -6,14 +6,29 @@ use egui::{
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
+#[derive(Default)]
 pub struct TemplateApp {
+    sim: Sim,
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Default)]
+pub struct Sim {
     intrin: SimIntrinsics,
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Clone, Debug, Default)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 pub struct SimIntrinsics {
     elements: Vec<Element>,
+    symmetry: Symmetry,
     rules: HashMap<ElementIndexBlock, ElementIndexBlock>,
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug, Default)]
+pub struct Symmetry {
+    /// Symmetry over the y axis
+    horizontal: bool,
+    //vertical: bool,
+    //rotational: bool,
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
@@ -24,22 +39,21 @@ pub struct Element {
 
 pub type ElementIndexBlock = [usize; 4];
 
-impl Default for TemplateApp {
+impl Default for SimIntrinsics {
     fn default() -> Self {
         Self {
-            intrin: SimIntrinsics {
-                elements: vec![
-                    Element {
-                        color: Color32::BLACK,
-                        name: "Off".to_string(),
-                    },
-                    Element {
-                        color: Color32::WHITE,
-                        name: "On".to_string(),
-                    },
-                ],
-                rules: [([1, 0, 1, 0], [0, 0, 1, 1])].into_iter().collect(),
-            },
+            elements: vec![
+                Element {
+                    color: Color32::BLACK,
+                    name: "Off".to_string(),
+                },
+                Element {
+                    color: Color32::WHITE,
+                    name: "On".to_string(),
+                },
+            ],
+            rules: [([1, 0, 1, 0], [0, 0, 1, 1])].into_iter().collect(),
+            symmetry: Symmetry { horizontal: true },
         }
     }
 }
@@ -64,7 +78,7 @@ impl eframe::App for TemplateApp {
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            sim_intrin_editor(ui, &mut self.intrin);
+            sim_intrin_editor(ui, &mut self.sim.intrin);
         });
     }
 }
@@ -86,6 +100,10 @@ fn sim_intrin_editor(ui: &mut Ui, intrin: &mut SimIntrinsics) {
     {
         intrin.elements.resize_with(num_elem, || Element::default());
     }
+    ui.separator();
+
+    ui.strong("Symmetry");
+    ui.checkbox(&mut intrin.symmetry.horizontal, "Horizontal");
     ui.separator();
 
     ui.strong("Rules");
@@ -166,3 +184,5 @@ fn element_button(ui: &mut Ui, element: &Element) -> egui::Response {
             ui.label(&element.name);
         })
 }
+
+impl SimIntrinsics {}
